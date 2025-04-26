@@ -1,6 +1,5 @@
 ﻿using UnityEngine;
 
-
 namespace MatchThreeSystem
 {
         [CreateAssetMenu(fileName = "Piece Type", menuName = "SO/PieceType", order = 0)]
