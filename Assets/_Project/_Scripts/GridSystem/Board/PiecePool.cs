@@ -59,6 +59,8 @@ namespace MatchThreeSystem
         {
             var currentType = piece.Type;
             var nextType = (PieceType)(((int)currentType + 1) % PieceTypeCount());
+
+            if (nextType == PieceType.None) nextType = (PieceType)((int)currentType + 1);
             
             var pieceInfo = _pieceInfos.Find(x => x.type == nextType);
             piece.Init(pieceInfo);
