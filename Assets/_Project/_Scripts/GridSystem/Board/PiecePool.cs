@@ -32,11 +32,14 @@ namespace MatchThreeSystem
             return piece;
         }
 
-        public Piece GetRandomPiece()
+        public PieceType GetRandomPieceType()
         {
             var randomIndex = UnityEngine.Random.Range(0, _pieceInfos.Count);
-            var pieceInfo = _pieceInfos[randomIndex];
+            return _pieceInfos[randomIndex].type;
+        }
 
+        public Piece GetPiece(PieceInfo pieceInfo)
+        {
             var piece = Get();
             piece.Init(pieceInfo);
             return piece;
@@ -45,6 +48,20 @@ namespace MatchThreeSystem
         public void ReturnPiece(Piece piece)
         {
             Return(piece);
+        }
+        
+        public int PieceTypeCount()
+        {
+            return _pieceInfos.Count;
+        }
+
+        public void ChangePieceInfoToNextType(Piece piece)
+        {
+            var currentType = piece.Type;
+            var nextType = (PieceType)(((int)currentType + 1) % PieceTypeCount());
+            
+            var pieceInfo = _pieceInfos.Find(x => x.type == nextType);
+            piece.Init(pieceInfo);
         }
     }
 }

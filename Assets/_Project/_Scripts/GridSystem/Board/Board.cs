@@ -21,30 +21,17 @@ namespace MatchThreeSystem
         [SerializeField, Anywhere] private PiecePool _piecePool;
         [SerializeField, Anywhere] private SpriteMask _spriteMask;
 
-        [Header("Grid Settings")] [SerializeField]
-        private float _maskOffset = 0.5f;
+        [Header("Grid Settings")]
+        [SerializeField] private BoardInfo _boardInfo;
+        [SerializeField] private bool _debug = false;
 
-        [SerializeField] private int width = 5;
-        [SerializeField] private int height = 5;
-        [SerializeField] private int extra = 5;
-        [SerializeField] private int cellSize = 1;
-        [SerializeField] private Vector3 originPosition = Vector3.zero;
-        [SerializeField] private bool debug = false;
-
-        [Header("Swap Settings")] [FormerlySerializedAs("swapDuration"), SerializeField]
-        private float _swapDuration = 0.5f;
-
-        [SerializeField] private Ease _swapEase = Ease.OutBack;
-
-        [Header("Fall Settings")] [SerializeField]
-        private float _fallDuration = 1.0f;
-
-        [SerializeField] private Ease _fallEase = Ease.InQuint;
+        private Vector3 _rootPosition;
 
         private Camera _mainCamera;
         private GridSystem2D<Cell<Piece>> _grid;
-        [SerializeField] private Vector2Int _firstSelectedPiece;
-        [SerializeField] private Vector2Int _secondSelectedPiece;
+        
+        private Vector2Int _firstSelectedPiece;
+        private Vector2Int _secondSelectedPiece;
 
         private Dictionary<PieceType, int> _explodedPiece;
 
@@ -68,12 +55,14 @@ namespace MatchThreeSystem
 
         private void InitializeVariables()
         {
+            _rootPosition = new Vector2(_boardInfo.Width, _boardInfo.Height) / 2 * -1;
+            
             _mainCamera = Camera.main;
             _firstSelectedPiece = Vector2Int.one * -1;
             _secondSelectedPiece = Vector2Int.one * -1;
 
-            _spriteMask.transform.localScale = new Vector3(width, height + _maskOffset, 1);
-            _spriteMask.transform.position += new Vector3(0, _maskOffset / 2, 0);
+            _spriteMask.transform.localScale = new Vector3(_boardInfo.Width, _boardInfo.Height + _boardInfo.MaskOffset, 1);
+            _spriteMask.transform.position += new Vector3(0, _boardInfo.MaskOffset / 2, 0);
 
             _explodedPiece = new Dictionary<PieceType, int>();
         }
@@ -86,14 +75,15 @@ namespace MatchThreeSystem
 
         private async void InitializeGrid()
         {
-            _grid = GridSystem2D<Cell<Piece>>.VerticalGrid(width, height, extra, cellSize, originPosition, debug);
-
+            _grid = GridSystem2D<Cell<Piece>>.VerticalGrid(_boardInfo.Width, _boardInfo.Height, _boardInfo.Extra,
+                _boardInfo.CellSize, _rootPosition, _debug);
+            
             await GenerateAndDropPieces();
         }
 
         private async Task GenerateAndDropPieces()
         {
-            GeneratePiecesInExtraCell();
+            GeneratePiecesInExtraCellWithoutMatch();
             await MakePiecesFall();
             GeneratePiecesInExtraCell();
         }
@@ -101,22 +91,50 @@ namespace MatchThreeSystem
         #endregion
 
         #region Grid Management
-        private void CreatePiece(int x, int y)
+        private Piece CreateRandomPiece(int x, int y)
+        {
+            var type = _piecePool.GetRandomPieceType();
+            return CreatePiece(x,y,type);
+        }
+
+        private Piece CreatePiece(int x, int y, PieceType type)
         {
             var cell = new Cell<Piece>(_grid, x, y);
             _grid.SetValue(x, y, cell);
+            
+            var piece = _piecePool.GetPiece(type);
+            cell.SetItem(piece);
 
-            cell.SetItem(_piecePool.GetRandomPiece());
+            return piece;
         }
         private void GeneratePiecesInExtraCell()
         {
-            for (var x = 0; x < width; x++)
+            for (var x = 0; x < _boardInfo.Width; x++)
             {
-                for (var y = extra; y < height + extra; y++)
+                for (var y = _boardInfo.Extra; y < _boardInfo.Height + _boardInfo.Extra; y++)
                 {
                     if (_grid.GetValue(x, y) == null)
                     {
-                        CreatePiece(x, y);
+                        CreateRandomPiece(x, y);
+                    }
+                }
+            }
+        }
+        private void GeneratePiecesInExtraCellWithoutMatch()
+        {
+            for (var x = 0; x < _boardInfo.Width; x++)
+            {
+                for (var y = _boardInfo.Extra; y < _boardInfo.Height + _boardInfo.Extra; y++)
+                {
+                    if (_grid.GetValue(x, y) == null)
+                    {
+                        var piece = CreateRandomPiece(x, y);
+                        for (var i = 0; i < _piecePool.PieceTypeCount(); i++)
+                        {
+                            var matches = FindMatchesRelateToPiece((new Vector2Int(x, y)), true);
+                            if (matches.Count == 0) break;
+                            _piecePool.ChangePieceInfoToNextType(piece);
+                        }                
                     }
                 }
             }
@@ -127,11 +145,11 @@ namespace MatchThreeSystem
         private async Task MakePiecesFall()
         {
             var sequence = DOTween.Sequence();
-            for (var x = 0; x < width; x++)
+            for (var x = 0; x < _boardInfo.Width; x++)
             {
-                int emptyRow = -1;
+                var emptyRow = -1;
 
-                for (var y = 0; y < height + extra; y++)
+                for (var y = 0; y < _boardInfo.Height + _boardInfo.Extra; y++)
                 {
                     var cell = _grid.GetValue(x, y);
                     if (cell == null)
@@ -147,8 +165,8 @@ namespace MatchThreeSystem
                         _grid.SetValue(x, y, null);
 
                         sequence.Join(piece.transform
-                            .DOLocalMove(_grid.GetWorldPositionCenter(x, emptyRow), _fallDuration)
-                            .SetEase(_fallEase));
+                            .DOLocalMove(_grid.GetWorldPositionCenter(x, emptyRow), _boardInfo.FallDuration)
+                            .SetEase(_boardInfo.FallEase));
 
                         emptyRow++;
                     }
@@ -159,7 +177,7 @@ namespace MatchThreeSystem
         }
         private async Task ExplodePieces(List<Vector2Int> matches)
         {
-            List<Piece> explodedPieces = new List<Piece>();
+            var explodedPieces = new List<Piece>();
             var sequence = DOTween.Sequence();
             foreach (var match in matches)
             {
@@ -192,77 +210,63 @@ namespace MatchThreeSystem
         #endregion
 
         #region Match Finding
-        private List<Vector2Int> FindMatches()
+        private List<Vector2Int> FindMatches(bool checkExtra = false)
         {
             if (_firstSelectedPiece != Vector2Int.one * -1 && _secondSelectedPiece != Vector2Int.one * -1)
-                return FindMatchesRelateToSelect();
+                return FindMatchesRelateToSelect(checkExtra);
 
             return FindMatchAllGrid();
         }
-        private List<Vector2Int> FindMatchesRelateToSelect()
+        private List<Vector2Int> FindMatchesRelateToSelect(bool checkExtra = false)
         {
             HashSet<Vector2Int> matches = new();
 
-            //check first selected piece
-            //check horizontal matches of first selected piece
-            for (var x = 0; x < width - 2; x++)
+            var firstMatched = FindMatchesRelateToPiece(_firstSelectedPiece, checkExtra);
+            var secondMatched = FindMatchesRelateToPiece(_secondSelectedPiece, checkExtra);
+            
+            matches.UnionWith(firstMatched);
+            matches.UnionWith(secondMatched);
+
+            List<Vector2Int> sortedMatches = new(matches);
+            sortedMatches.Sort((a, b) => a.x == b.x ? a.y.CompareTo(b.y) : a.x.CompareTo(b.x));
+            return sortedMatches;
+        }
+
+        private List<Vector2Int> FindMatchesRelateToPiece(Vector2Int pos, bool checkExtra = false)
+        {
+            HashSet<Vector2Int> matches = new();
+            
+            var startY = checkExtra ? _boardInfo.Extra : 0;
+            var endY = checkExtra ? _boardInfo.Height + _boardInfo.Extra : _boardInfo.Height;
+
+            //check horizontal matches
+            for (var x = 0; x < _boardInfo.Width - 2; x++)
             {
-                if (AreThreeMatching(new Vector2Int(x, _firstSelectedPiece.y),
-                        new Vector2Int(x + 1, _firstSelectedPiece.y), new Vector2Int(x + 2, _firstSelectedPiece.y)))
+                if (AreThreeMatching(new Vector2Int(x, pos.y),
+                        new Vector2Int(x + 1, pos.y), new Vector2Int(x + 2, pos.y)))
                 {
                     matches.UnionWith(new[]
                     {
-                        new Vector2Int(x, _firstSelectedPiece.y), new Vector2Int(x + 1, _firstSelectedPiece.y),
-                        new Vector2Int(x + 2, _firstSelectedPiece.y)
+                        new Vector2Int(x, pos.y), new Vector2Int(x + 1, pos.y),
+                        new Vector2Int(x + 2, pos.y)
                     });
                 }
             }
 
-            //check vertical matches of first selected piece
-            for (var y = 0; y < height - 2; y++)
+            //check vertical matches
+            for (var y = startY; y < endY - 2; y++)
             {
-                if (AreThreeMatching(new Vector2Int(_firstSelectedPiece.x, y),
-                        new Vector2Int(_firstSelectedPiece.x, y + 1), new Vector2Int(_firstSelectedPiece.x, y + 2)))
+                if (AreThreeMatching(new Vector2Int(pos.x, y),
+                        new Vector2Int(pos.x, y + 1), new Vector2Int(pos.x, y + 2)))
                 {
                     matches.UnionWith(new[]
                     {
-                        new Vector2Int(_firstSelectedPiece.x, y), new Vector2Int(_firstSelectedPiece.x, y + 1),
-                        new Vector2Int(_firstSelectedPiece.x, y + 2)
+                        new Vector2Int(pos.x, y), new Vector2Int(pos.x, y + 1),
+                        new Vector2Int(pos.x, y + 2)
                     });
                 }
             }
-
-            //check second selected piece
-            //check horizontal matches of second selected piece
-            for (var x = 0; x < width - 2; x++)
-            {
-                if (AreThreeMatching(new Vector2Int(x, _secondSelectedPiece.y),
-                        new Vector2Int(x + 1, _secondSelectedPiece.y), new Vector2Int(x + 2, _secondSelectedPiece.y)))
-                {
-                    matches.UnionWith(new[]
-                    {
-                        new Vector2Int(x, _secondSelectedPiece.y), new Vector2Int(x + 1, _secondSelectedPiece.y),
-                        new Vector2Int(x + 2, _secondSelectedPiece.y)
-                    });
-                }
-            }
-
-            //check vertical matches of second selected piece
-            for (var y = 0; y < height - 2; y++)
-            {
-                if (AreThreeMatching(new Vector2Int(_secondSelectedPiece.x, y),
-                        new Vector2Int(_secondSelectedPiece.x, y + 1), new Vector2Int(_secondSelectedPiece.x, y + 2)))
-                {
-                    matches.UnionWith(new[]
-                    {
-                        new Vector2Int(_secondSelectedPiece.x, y), new Vector2Int(_secondSelectedPiece.x, y + 1),
-                        new Vector2Int(_secondSelectedPiece.x, y + 2)
-                    });
-                }
-            }
-
-
-
+            
             List<Vector2Int> sortedMatches = new(matches);
             sortedMatches.Sort((a, b) => a.x == b.x ? a.y.CompareTo(b.y) : a.x.CompareTo(b.x));
             return sortedMatches;
@@ -272,9 +276,9 @@ namespace MatchThreeSystem
             HashSet<Vector2Int> matches = new();
 
             // Horizontal Matches
-            for (var y = 0; y < height; y++)
+            for (var y = 0; y < _boardInfo.Height; y++)
             {
-                for (var x = 0; x < width - 2; x++)
+                for (var x = 0; x < _boardInfo.Width - 2; x++)
                 {
                     if (AreThreeMatching(new Vector2Int(x, y), new Vector2Int(x + 1, y), new Vector2Int(x + 2, y)))
                     {
@@ -285,9 +289,9 @@ namespace MatchThreeSystem
             }
 
             // Vertical Matches
-            for (var x = 0; x < width; x++)
+            for (var x = 0; x < _boardInfo.Width; x++)
             {
-                for (var y = 0; y < height - 2; y++)
+                for (var y = 0; y < _boardInfo.Height - 2; y++)
                 {
                     if (AreThreeMatching(new Vector2Int(x, y), new Vector2Int(x, y + 1), new Vector2Int(x, y + 2)))
                     {
@@ -315,7 +319,6 @@ namespace MatchThreeSystem
         #endregion
 
         #region Selection and Swapping
-
         private async void OnSelectPiece()
         {
             if (_firstSelectedPiece != Vector2Int.one * -1 && _secondSelectedPiece != Vector2Int.one * -1) return;
@@ -355,7 +358,36 @@ namespace MatchThreeSystem
                 SelectPiece(gridPos);
             }
         }
+        private async Task SwapSelectedPieces()
+        {
+            var firstCell = _grid.GetValue(_firstSelectedPiece.x, _firstSelectedPiece.y);
+            var secondCell = _grid.GetValue(_secondSelectedPiece.x, _secondSelectedPiece.y);
 
+            var sequence = DOTween.Sequence();
+
+            sequence.Join(firstCell.GetItem().transform
+                .DOLocalMove(_grid.GetWorldPositionCenter(_secondSelectedPiece.x, _secondSelectedPiece.y),
+                    _boardInfo.SwapDuration)
+                .SetEase(_boardInfo.SwapEase));
+
+            sequence.Join(secondCell.GetItem().transform
+                .DOLocalMove(_grid.GetWorldPositionCenter(_firstSelectedPiece.x, _firstSelectedPiece.y), _boardInfo.SwapDuration)
+                .SetEase(_boardInfo.SwapEase));
+
+            _grid.SetValue(_firstSelectedPiece.x, _firstSelectedPiece.y, secondCell);
+            _grid.SetValue(_secondSelectedPiece.x, _secondSelectedPiece.y, firstCell);
+
+            await sequence.AsyncWaitForCompletion();
+        }
+        private void DeselectPieces() =>
+            (_firstSelectedPiece, _secondSelectedPiece) = (Vector2Int.one * -1, Vector2Int.one * -1);
+        private void SelectPiece(Vector2Int pos) =>
+            (_firstSelectedPiece, _secondSelectedPiece) = _firstSelectedPiece == Vector2Int.one * -1
+                ? (pos, _secondSelectedPiece)
+                : (_firstSelectedPiece, pos);
+        #endregion
+
+        #region Board Action
         private async Task HandleBoardAction()
         {
             await SwapSelectedPieces();
@@ -388,42 +420,12 @@ namespace MatchThreeSystem
                 matches = FindMatchAllGrid();
             }
         }
-
-        private async Task SwapSelectedPieces()
-        {
-            var firstCell = _grid.GetValue(_firstSelectedPiece.x, _firstSelectedPiece.y);
-            var secondCell = _grid.GetValue(_secondSelectedPiece.x, _secondSelectedPiece.y);
-
-            var sequence = DOTween.Sequence();
-
-            sequence.Join(firstCell.GetItem().transform
-                .DOLocalMove(_grid.GetWorldPositionCenter(_secondSelectedPiece.x, _secondSelectedPiece.y),
-                    _swapDuration)
-                .SetEase(_swapEase));
-
-            sequence.Join(secondCell.GetItem().transform
-                .DOLocalMove(_grid.GetWorldPositionCenter(_firstSelectedPiece.x, _firstSelectedPiece.y), _swapDuration)
-                .SetEase(_swapEase));
-
-            _grid.SetValue(_firstSelectedPiece.x, _firstSelectedPiece.y, secondCell);
-            _grid.SetValue(_secondSelectedPiece.x, _secondSelectedPiece.y, firstCell);
-
-            await sequence.AsyncWaitForCompletion();
-        }
-
-        private void DeselectPieces() =>
-            (_firstSelectedPiece, _secondSelectedPiece) = (Vector2Int.one * -1, Vector2Int.one * -1);
-
-        private void SelectPiece(Vector2Int pos) =>
-            (_firstSelectedPiece, _secondSelectedPiece) = _firstSelectedPiece == Vector2Int.one * -1
-                ? (pos, _secondSelectedPiece)
-                : (_firstSelectedPiece, pos);
         #endregion
 
         #region Utils
         private static bool IsNeighbor(Vector2Int first, Vector2Int second) => Mathf.Abs(first.x - second.x) + Mathf.Abs(first.y - second.y) == 1;
         private bool IsEmptyPosition(Vector2Int pos) => _grid.GetValue(pos.x, pos.y) == null;
-        private bool IsValidPosition(Vector2Int pos) => pos.x >= 0 && pos.x < width && pos.y >= 0 && pos.y < height;
+        private bool IsValidPosition(Vector2Int pos) => pos.x >= 0 && pos.x < _boardInfo.Width && pos.y >= 0 && pos.y < _boardInfo.Height;
         #endregion
     }
 }

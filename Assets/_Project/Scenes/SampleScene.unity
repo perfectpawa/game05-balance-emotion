@@ -638,7 +638,7 @@ GameObject:
   m_Layer: 0
   m_Name: Board
   m_TagString: Untagged
-  m_Icon: {fileID: 0}
+  m_Icon: {fileID: 7866945982896999795, guid: 0000000000000000d000000000000000, type: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
@@ -657,19 +657,8 @@ MonoBehaviour:
   _inputReader: {fileID: 11400000, guid: 1d68702fb6b276042b94658f7706ea83, type: 2}
   _piecePool: {fileID: 2135066997}
   _spriteMask: {fileID: 17261240}
-  _maskOffset: 0.5
-  width: 5
-  height: 5
-  extra: 5
-  cellSize: 1
-  originPosition: {x: -2.5, y: -2.5, z: 0}
-  debug: 0
-  _swapDuration: 0.5
-  _swapEase: 27
-  _fallDuration: 1
-  _fallEase: 14
-  _firstSelectedPiece: {x: 0, y: 0}
-  _secondSelectedPiece: {x: 0, y: 0}
+  _boardInfo: {fileID: 11400000, guid: 70c88c9a0a25e2b4cbbd4d46c767d66a, type: 2}
+  _debug: 0
 --- !u!4 &2039014326
 Transform:
   m_ObjectHideFlags: 0
