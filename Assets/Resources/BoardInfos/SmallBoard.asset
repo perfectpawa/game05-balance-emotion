@@ -16,8 +16,14 @@ MonoBehaviour:
   Width: 5
   Height: 5
   Extra: 5
-  CellSize: 1
+  CellSize: 1.25
+  SelectPopDuration: 0.1
+  SelectPopOutScale: 1.2
+  SelectPopOffScale: 1
+  SelectPopSwapEase: 27
   SwapDuration: 0.25
   SwapEase: 27
+  ExplodeDuration: 0.1
+  ExplodeEase: 27
   FallDuration: 0.5
   FallEase: 14

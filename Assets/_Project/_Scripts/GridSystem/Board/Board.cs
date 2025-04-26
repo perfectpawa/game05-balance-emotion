@@ -35,6 +35,7 @@ namespace MatchThreeSystem
 
         private Dictionary<PieceType, int> _explodedPiece;
 
+        public Action<Dictionary<PieceType, int>> CompleteExplode;
 
         #endregion
 
@@ -55,13 +56,18 @@ namespace MatchThreeSystem
 
         private void InitializeVariables()
         {
-            _rootPosition = new Vector2(_boardInfo.Width, _boardInfo.Height) / 2 * -1;
+            _rootPosition = new Vector2(_boardInfo.Width, _boardInfo.Height) / 2 * -1 * _boardInfo.CellSize;
             
             _mainCamera = Camera.main;
             _firstSelectedPiece = Vector2Int.one * -1;
             _secondSelectedPiece = Vector2Int.one * -1;
 
-            _spriteMask.transform.localScale = new Vector3(_boardInfo.Width, _boardInfo.Height + _boardInfo.MaskOffset, 1);
+            _spriteMask.transform.localScale = new Vector3(
+                _boardInfo.Width * _boardInfo.CellSize, 
+                (_boardInfo.Height + _boardInfo.MaskOffset) * _boardInfo.CellSize, 
+                1
+            );
+            
             _spriteMask.transform.position += new Vector3(0, _boardInfo.MaskOffset / 2, 0);
 
             _explodedPiece = new Dictionary<PieceType, int>();
@@ -187,7 +193,7 @@ namespace MatchThreeSystem
                 explodedPieces.Add(piece);
 
                 _grid.SetValue(match.x, match.y, null);
-                sequence.Join(piece.transform.DOScale(Vector3.zero, 0.25f).SetEase(Ease.OutBack));
+                sequence.Join(piece.transform.DOScale(Vector3.zero, _boardInfo.ExplodeDuration).SetEase(_boardInfo.ExplodeEase));
             }
 
             //save count of pieces type to be exploded
@@ -344,12 +350,9 @@ namespace MatchThreeSystem
                 finally
                 {
                     DeselectPieces();
-
-                    //print exploded pieces
-                    foreach (var piece in _explodedPiece)
-                    {
-                        Debug.Log($"Piece: {piece.Key}, Count: {piece.Value}");
-                    }
+                    
+                    CompleteExplode?.Invoke(_explodedPiece);
+                    _explodedPiece.Clear();
                 }
             }
             else
@@ -379,18 +382,58 @@ namespace MatchThreeSystem
 
             await sequence.AsyncWaitForCompletion();
         }
-        private void DeselectPieces() =>
+        private void DeselectPieces()
+        {
+            PopOffSelectedPieces();
+            
             (_firstSelectedPiece, _secondSelectedPiece) = (Vector2Int.one * -1, Vector2Int.one * -1);
-        private void SelectPiece(Vector2Int pos) =>
+        }
+
+        private void SelectPiece(Vector2Int pos)
+        {
             (_firstSelectedPiece, _secondSelectedPiece) = _firstSelectedPiece == Vector2Int.one * -1
                 ? (pos, _secondSelectedPiece)
                 : (_firstSelectedPiece, pos);
+
+            var sequence = DOTween.Sequence();
+            var piece = _grid.GetValue(pos.x, pos.y)?.GetItem();
+            
+            if (piece == null) return;
+            
+            sequence.Join(piece.transform
+                .DOScale(Vector3.one * _boardInfo.SelectPopOutScale, _boardInfo.SelectPopDuration)
+                .SetEase(_boardInfo.SelectPopSwapEase));
+            
+        }
+
+        private void PopOffSelectedPieces()
+        {
+            var sequence = DOTween.Sequence();
+            
+            if (_firstSelectedPiece != Vector2Int.one * -1)
+            {
+                sequence.Join(
+                    _grid.GetValue(_firstSelectedPiece.x, _firstSelectedPiece.y)?.GetItem().transform
+                        .DOScale(Vector3.one * _boardInfo.SelectPopOffScale, _boardInfo.SelectPopDuration)
+                        .SetEase(_boardInfo.SelectPopSwapEase));
+            }
+            
+            if (_secondSelectedPiece != Vector2Int.one * -1)
+            {
+                sequence.Join(
+                    _grid.GetValue(_secondSelectedPiece.x, _secondSelectedPiece.y)?.GetItem().transform
+                        .DOScale(Vector3.one * _boardInfo.SelectPopOffScale, _boardInfo.SelectPopDuration)
+                        .SetEase(_boardInfo.SelectPopSwapEase));
+            }
+
+        }
         #endregion
 
         #region Board Action
         private async Task HandleBoardAction()
         {
             await SwapSelectedPieces();
+            PopOffSelectedPieces();
 
             var matches = FindMatchesRelateToSelect();
 
@@ -399,17 +442,7 @@ namespace MatchThreeSystem
                 await SwapSelectedPieces();
                 return;
             }
-
-            _explodedPiece.Clear();
-
-            await ExplodePieces(matches);
-            await MakePiecesFall();
-            GeneratePiecesInExtraCell();
-
-            matches.Clear();
-
-            matches = FindMatchAllGrid();
-
+            
             while (matches.Count > 0)
             {
                 await ExplodePieces(matches);

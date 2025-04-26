@@ -17,6 +17,7 @@ namespace MatchThreeSystem
     }
     public enum PieceType
     {
+        None,
         Attack,
         Defense,
         Health,
