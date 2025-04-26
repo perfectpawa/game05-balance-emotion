@@ -4,10 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using DG.Tweening;
 using KBCore.Refs;
-using NUnit.Framework;
 using UnityEngine;
-using UnityEngine.Events;
-using UnityEngine.Serialization;
 
 namespace MatchThreeSystem
 {
@@ -193,15 +190,16 @@ namespace MatchThreeSystem
                 explodedPieces.Add(piece);
 
                 _grid.SetValue(match.x, match.y, null);
-                sequence.Join(piece.transform.DOScale(Vector3.zero, _boardInfo.ExplodeDuration).SetEase(_boardInfo.ExplodeEase));
+                sequence.Append(piece.transform.DOScale(Vector3.zero, _boardInfo.ExplodeDuration).SetEase(_boardInfo.ExplodeEase));
             }
+
+            sequence.Play();
 
             //save count of pieces type to be exploded
             foreach (var piece in explodedPieces.Where(piece => !_explodedPiece.TryAdd(piece.Type, 1)))
             {
                 _explodedPiece[piece.Type]++;
             }
-
 
             sequence.OnComplete(() =>
             {
@@ -234,7 +232,7 @@ namespace MatchThreeSystem
             matches.UnionWith(secondMatched);
 
             List<Vector2Int> sortedMatches = new(matches);
-            sortedMatches.Sort((a, b) => a.x == b.x ? a.y.CompareTo(b.y) : a.x.CompareTo(b.x));
+            // sortedMatches.Sort((a, b) => a.x == b.x ? a.y.CompareTo(b.y) : a.x.CompareTo(b.x));
             return sortedMatches;
         }
 
@@ -274,7 +272,7 @@ namespace MatchThreeSystem
             }
             
             List<Vector2Int> sortedMatches = new(matches);
-            sortedMatches.Sort((a, b) => a.x == b.x ? a.y.CompareTo(b.y) : a.x.CompareTo(b.x));
+            // sortedMatches.Sort((a, b) => a.x == b.x ? a.y.CompareTo(b.y) : a.x.CompareTo(b.x));
             return sortedMatches;
         }
         private List<Vector2Int> FindMatchAllGrid()
