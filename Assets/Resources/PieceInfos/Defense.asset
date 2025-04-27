@@ -12,5 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a19e6ca73d6849ff95da95e285274d3e, type: 3}
   m_Name: Defense
   m_EditorClassIdentifier: 
-  type: 1
+  type: 2
   sprite: {fileID: 3223180940824772514, guid: fcff374175be417489ebd5e83da94e25, type: 3}

@@ -24,6 +24,6 @@ MonoBehaviour:
   SwapDuration: 0.25
   SwapEase: 27
   ExplodeDuration: 0.1
-  ExplodeEase: 27
+  ExplodeEase: 31
   FallDuration: 0.5
   FallEase: 14

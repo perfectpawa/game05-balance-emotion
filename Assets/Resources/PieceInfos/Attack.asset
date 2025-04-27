@@ -12,5 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a19e6ca73d6849ff95da95e285274d3e, type: 3}
   m_Name: Attack
   m_EditorClassIdentifier: 
-  type: 0
+  type: 1
   sprite: {fileID: -2995627434062683977, guid: 45972ddc0b213b14799a90fde30432c4, type: 3}

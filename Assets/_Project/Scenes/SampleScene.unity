@@ -657,6 +657,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _board: {fileID: 2039014325}
   _explodedPieces: []
+  _pieceRatioCondition:
+  - Type: 1
+    Ratio: 1
+  - Type: 2
+    Ratio: 1
+  - Type: 3
+    Ratio: 2
+  _ratioWinCondition: 0
 --- !u!1 &1662235961
 GameObject:
   m_ObjectHideFlags: 0

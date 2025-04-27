@@ -12,5 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a19e6ca73d6849ff95da95e285274d3e, type: 3}
   m_Name: Mana
   m_EditorClassIdentifier: 
-  type: 3
+  type: 4
   sprite: {fileID: -7738207005358605439, guid: 33c677bd814932d4fbbb43a2570f65e0, type: 3}

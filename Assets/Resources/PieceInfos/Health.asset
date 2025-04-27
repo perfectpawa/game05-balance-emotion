@@ -12,5 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a19e6ca73d6849ff95da95e285274d3e, type: 3}
   m_Name: Health
   m_EditorClassIdentifier: 
-  type: 2
+  type: 3
   sprite: {fileID: 4606908045521496030, guid: 922f1d4f20cd7a14c828ce30a70fd911, type: 3}
