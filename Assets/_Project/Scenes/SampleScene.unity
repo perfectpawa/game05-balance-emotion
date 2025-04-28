@@ -578,7 +578,7 @@ SpriteRenderer:
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 0
-  m_MaskInteraction: 1
+  m_MaskInteraction: 0
   m_SpriteSortPoint: 0
 --- !u!1 &1105811385
 GameObject:
@@ -662,6 +662,7 @@ MonoBehaviour:
   - Type: 2
     Ratio: 1
   _ratioWinCondition: 0
+  _totalScore: 0
 --- !u!1 &1662235961
 GameObject:
   m_ObjectHideFlags: 0
@@ -737,7 +738,7 @@ SpriteRenderer:
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: -1
   m_Sprite: {fileID: 7482667652216324306, guid: 311925a002f4447b3a28927169b83ea6, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
@@ -806,6 +807,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2039014326}
   - component: {fileID: 2039014325}
+  - component: {fileID: 2039014327}
   m_Layer: 0
   m_Name: Board
   m_TagString: Untagged
@@ -820,7 +822,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2039014324}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1168f8b26ea54fadb1a739e71ca0a6f9, type: 3}
   m_Name: 
@@ -829,7 +831,7 @@ MonoBehaviour:
   _piecePool: {fileID: 2135066997}
   _spriteMask: {fileID: 17261240}
   _boardInfo: {fileID: 11400000, guid: 70c88c9a0a25e2b4cbbd4d46c767d66a, type: 2}
-  _debug: 0
+  _debug: 1
 --- !u!4 &2039014326
 Transform:
   m_ObjectHideFlags: 0
@@ -847,6 +849,25 @@ Transform:
   - {fileID: 17261241}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2039014327
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2039014324}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 318826171d00489fb4e2de1a4ac3df00, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _inputReader: {fileID: 11400000, guid: 1d68702fb6b276042b94658f7706ea83, type: 2}
+  _piecePool: {fileID: 2135066997}
+  _spriteMask: {fileID: 17261240}
+  _boardInfo: {fileID: 11400000, guid: 70c88c9a0a25e2b4cbbd4d46c767d66a, type: 2}
+  _boardDebug: 1
+  _firstSelectedPos: {x: 0, y: 0}
+  _secondSelectedPos: {x: 0, y: 0}
 --- !u!1 &2135066995
 GameObject:
   m_ObjectHideFlags: 0

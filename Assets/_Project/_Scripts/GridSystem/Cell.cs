@@ -17,7 +17,7 @@ namespace MatchThreeSystem
             _y = y;
         }
 
-        public void SetItem(T value)
+        public void SetItem(T value, bool updatePosition = true)
         {
             _item = value;
 
@@ -27,14 +27,13 @@ namespace MatchThreeSystem
 
             if (_item is MonoBehaviour monoBehaviour)
             {
-                monoBehaviour.transform.position = _position;
+                if (updatePosition) monoBehaviour.transform.position = _position;
             }
             else
             {
                 Debug.LogError($"{_item} is not a MonoBehaviour");
             }
         }
-
 
         public T GetItem() => _item;
         public Vector3 GetPosition() => _position;
