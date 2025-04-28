@@ -170,17 +170,18 @@ namespace MatchThreeSystem
                         sequence.Join(piece.transform
                             .DOLocalMove(_grid.GetWorldPositionCenter(x, emptyRow), _boardInfo.FallDuration)
                             .SetEase(_boardInfo.FallEase));
-
+                        
                         emptyRow++;
                     }
                 }
             }
-
+            
             await sequence.AsyncWaitForCompletion();
         }
         private async Task ExplodePieces(List<Vector2Int> matches)
         {
             var explodedPieces = new List<Piece>();
+            
             var sequence = DOTween.Sequence();
             foreach (var match in matches)
             {
@@ -214,13 +215,6 @@ namespace MatchThreeSystem
         #endregion
 
         #region Match Finding
-        private List<Vector2Int> FindMatches(bool checkExtra = false)
-        {
-            if (_firstSelectedPiece != Vector2Int.one * -1 && _secondSelectedPiece != Vector2Int.one * -1)
-                return FindMatchesRelateToSelect(checkExtra);
-
-            return FindMatchAllGrid();
-        }
         private List<Vector2Int> FindMatchesRelateToSelect(bool checkExtra = false)
         {
             HashSet<Vector2Int> matches = new();
@@ -256,7 +250,7 @@ namespace MatchThreeSystem
                     });
                 }
             }
-
+            
             //check vertical matches
             for (var y = startY; y < endY - 2; y++)
             {
@@ -271,10 +265,18 @@ namespace MatchThreeSystem
                 }
             }
             
+            
             List<Vector2Int> sortedMatches = new(matches);
-            // sortedMatches.Sort((a, b) => a.x == b.x ? a.y.CompareTo(b.y) : a.x.CompareTo(b.x));
+            sortedMatches.Sort((a, b) =>
+            {
+                var distanceA = Vector2Int.Distance(a, pos);
+                var distanceB = Vector2Int.Distance(b, pos);
+                
+                return distanceA.CompareTo(distanceB);
+            });
             return sortedMatches;
         }
+
         private List<Vector2Int> FindMatchAllGrid()
         {
             HashSet<Vector2Int> matches = new();
@@ -339,7 +341,7 @@ namespace MatchThreeSystem
                 SelectPiece(gridPos);
                 try
                 {
-                    await HandleBoardAction();
+                    await ResolveBoard();
                 }
                 catch (Exception e)
                 {
@@ -429,7 +431,7 @@ namespace MatchThreeSystem
         #endregion
 
         #region Board Action
-        private async Task HandleBoardAction()
+        private async Task ResolveBoard()
         {
             await SwapSelectedPieces();
             PopOffSelectedPieces();
@@ -447,6 +449,8 @@ namespace MatchThreeSystem
                 await ExplodePieces(matches);
                 await MakePiecesFall();
                 GeneratePiecesInExtraCell();
+                
+                
 
                 matches.Clear();
                 matches = FindMatchAllGrid();

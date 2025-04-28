@@ -13,7 +13,8 @@ public class LevelManager : MonoBehaviour
     private Dictionary<PieceType, int> _pieceCount;
     
     [SerializeField] private bool _ratioWinCondition;
-
+    [SerializeField] private long _totalScore;
+    
     private void Awake()
     {
         InitValue();
@@ -31,6 +32,9 @@ public class LevelManager : MonoBehaviour
 
     private void InitValue()
     {
+        _ratioWinCondition = false;
+        _totalScore = 0;
+        
         _explodedPieces = new List<ExplodedPieceData>();
         _pieceCount = new Dictionary<PieceType, int>();
         
@@ -76,7 +80,7 @@ public class LevelManager : MonoBehaviour
         }
         
         var pieceRatioInfo = new Dictionary<PieceType, float>();
-        
+
         var baseRatio = _pieceCount[_pieceRatioCondition[0].Type] / _pieceRatioCondition[0].Ratio;
 
         pieceRatioInfo.Add(_pieceRatioCondition[0].Type, baseRatio);
@@ -98,7 +102,10 @@ public class LevelManager : MonoBehaviour
                 _ratioWinCondition = false;
             }
         }
-        
+    }
+
+    private void HandleCalculateScoreWhenPieceMatch()
+    {
         
     }
 }
