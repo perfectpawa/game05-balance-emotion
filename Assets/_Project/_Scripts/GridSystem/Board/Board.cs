@@ -6,6 +6,8 @@ using DG.Tweening;
 using KBCore.Refs;
 using UnityEngine;
 
+using EventManager;
+
 namespace MatchThreeSystem
 {
     public class Board : MonoBehaviour
@@ -31,8 +33,6 @@ namespace MatchThreeSystem
         private Vector2Int _secondSelectedPiece;
 
         private Dictionary<PieceType, int> _explodedPiece;
-
-        public Action<Dictionary<PieceType, int>> CompleteExplode;
 
         #endregion
 
@@ -349,7 +349,8 @@ namespace MatchThreeSystem
                 {
                     DeselectPieces();
                     
-                    CompleteExplode?.Invoke(_explodedPiece);
+                    GenericEventManager.EmitEvent(EventName.BoardEvent.BoardResolved, _explodedPiece);
+                    
                     _explodedPiece.Clear();
                 }
             }

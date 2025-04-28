@@ -1,33 +1,32 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using KBCore.Refs;
+using EventManager;
 using MatchThreeSystem;
 using UnityEngine;
 
-public class LevelManager : ValidatedMonoBehaviour
+public class LevelManager : MonoBehaviour
 {
-    [SerializeField, Anywhere] private Board _board;
-
     [SerializeField] private List<ExplodedPieceData> _explodedPieces;
     [SerializeField] private List<PieceRatio> _pieceRatioCondition;
 
     private Dictionary<PieceType, int> _pieceCount;
     
     [SerializeField] private bool _ratioWinCondition;
-    
-    private void OnEnable()
-    {
-        _board.CompleteExplode += HandleCompleteExplodePiece;
-    }
-    private void OnDisable()
-    {
-        _board.CompleteExplode -= HandleCompleteExplodePiece;
-    }
 
     private void Awake()
     {
         InitValue();
+    }
+
+    private void OnEnable()
+    {
+        GenericEventManager.StartListening<Dictionary<PieceType, int>>(EventName.BoardEvent.BoardResolved, HandleBoardResolved);
+    }
+
+    private void OnDisable()
+    {
+        GenericEventManager.StopListening<Dictionary<PieceType, int>>(EventName.BoardEvent.BoardResolved, HandleBoardResolved);
     }
 
     private void InitValue()
@@ -49,7 +48,7 @@ public class LevelManager : ValidatedMonoBehaviour
         }
     }
 
-    private void HandleCompleteExplodePiece(Dictionary<PieceType, int> explodedPieceData)
+    private void HandleBoardResolved(Dictionary<PieceType, int> explodedPieceData)
     {
         foreach (var piece in explodedPieceData)
         {
@@ -67,16 +66,21 @@ public class LevelManager : ValidatedMonoBehaviour
 
     private void CheckPieceRatioWinCondition()
     {
-        _ratioWinCondition = false;
+        _ratioWinCondition = true;
         
         if (_pieceRatioCondition.Count < 2)
         {
             Debug.LogWarning("Please add at least 2 piece ratio condition");
+            _ratioWinCondition = false;
             return;
         }
         
+        var pieceRatioInfo = new Dictionary<PieceType, float>();
+        
         var baseRatio = _pieceCount[_pieceRatioCondition[0].Type] / _pieceRatioCondition[0].Ratio;
 
+        pieceRatioInfo.Add(_pieceRatioCondition[0].Type, baseRatio);
+        
         for (var i = 1; i < _pieceRatioCondition.Count; i++)
         {
             var count = _pieceCount[_pieceRatioCondition[i].Type];
@@ -84,19 +88,18 @@ public class LevelManager : ValidatedMonoBehaviour
             if (count == 0)
             {
                 _ratioWinCondition = false;
-                return;
             }
             
             var currentRatio = count / _pieceRatioCondition[i].Ratio;
+            pieceRatioInfo.Add(_pieceRatioCondition[i].Type, currentRatio);
 
             if (!Mathf.Approximately(baseRatio, currentRatio))
             {
                 _ratioWinCondition = false;
-                return;
             }
         }
-
-        _ratioWinCondition = true;
+        
+        
     }
 }
 
