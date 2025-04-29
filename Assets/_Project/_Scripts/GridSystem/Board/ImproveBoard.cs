@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using DG.Tweening;
 using KBCore.Refs;
@@ -25,10 +26,12 @@ public class ImproveBoard: ValidatedMonoBehaviour
     private Vector3 _rootPosition;
 
     private GridSystem2D<Cell<Piece>> _grid;
-    [SerializeField] private Vector2Int _firstSelectedPos;
-    [SerializeField] private Vector2Int _secondSelectedPos;
     
-    private List<Vector2Int> _matchPositions;
+    private Vector2Int _firstSelectedPos;
+    private Vector2Int _secondSelectedPos;
+    private bool _enableSelection;
+
+    [SerializeField] private List<Vector2Int> _matchPositions;
 
     #endregion
     
@@ -62,6 +65,7 @@ public class ImproveBoard: ValidatedMonoBehaviour
         
         _firstSelectedPos = Vector2Int.one * -1;
         _secondSelectedPos = Vector2Int.one * -1;
+        _enableSelection = true;
     }
 
     private void SetupInput()
@@ -80,10 +84,9 @@ public class ImproveBoard: ValidatedMonoBehaviour
 
     private async Task GenerateAndDropPieces()
     {
-        GeneratePiecesInVisibleCell();
-        // GeneratePiecesInExtraCellWithoutMatch();
-        // await MakePiecesFall();
-        // GeneratePiecesInExtraCell();
+        GeneratePiecesInExtraCellWithoutMatch();
+        await MakePiecesFall();
+        GeneratePiecesInExtraCell();
     }
     #endregion
     
@@ -93,7 +96,6 @@ public class ImproveBoard: ValidatedMonoBehaviour
         var type = _piecePool.GetRandomPieceType();
         return CreatePiece(x,y,type);
     }
-
     private Piece CreatePiece(int x, int y, PieceType type)
     {
         var cell = new Cell<Piece>(_grid, x, y);
@@ -117,7 +119,6 @@ public class ImproveBoard: ValidatedMonoBehaviour
             }
         }
     }
-    
     private void GeneratePiecesInExtraCellWithoutMatch()
     {
         for (var x = 0; x < _boardInfo.Width; x++)
@@ -140,25 +141,10 @@ public class ImproveBoard: ValidatedMonoBehaviour
             }
         }
     }
-
-    private void GeneratePiecesInVisibleCell()
-    {
-        for (var x = 0; x < _boardInfo.Width; x++)
-        {
-            for (var y = 0; y < _boardInfo.Height; y++)
-            {
-                if (_grid.GetValue(x, y) == null)
-                {
-                    CreateRandomPiece(x, y);
-                }
-            }
-        }
-    }
     #endregion
-
-    private async void OnSelectPiece()
+    private void OnSelectPiece()
     {
-        if (_firstSelectedPos != Vector2Int.one * -1 && _secondSelectedPos != Vector2Int.one * -1) return;
+        if (!_enableSelection) return;
         
         var selectGridPos = _grid.GetXY(_mainCamera.ScreenToWorldPoint(_inputReader.SelectPosition));
 
@@ -176,7 +162,8 @@ public class ImproveBoard: ValidatedMonoBehaviour
         {
             _secondSelectedPos = selectGridPos;
             PopOutPiece(_secondSelectedPos);
-            await HandleSwapSelectedPiece();
+            
+            HandleSwapSelectedPiece();
         }
         else
         {
@@ -186,73 +173,190 @@ public class ImproveBoard: ValidatedMonoBehaviour
             PopOutPiece(_firstSelectedPos);
         }
     }
-    
-    private async Task HandleSwapSelectedPiece()
+    private async void HandleSwapSelectedPiece()
     {
-        var firstCell = _grid.GetValue(_firstSelectedPos.x, _firstSelectedPos.y);
-        var secondCell = _grid.GetValue(_secondSelectedPos.x, _secondSelectedPos.y);
+        _enableSelection = false;
         
-        var firstPiece = firstCell.GetItem();
-        var secondPiece = secondCell.GetItem();
+        await SwapPieces(_firstSelectedPos, _secondSelectedPos);
         
-        var sequence = DOTween.Sequence();
-
-        sequence.Append(firstPiece.transform
-            .DOLocalMove(secondCell.GetPosition(), _boardInfo.SwapDuration)
-            .SetEase(_boardInfo.SwapEase)
-        );
+        var firstMatches = FindMatchesAtPos(_firstSelectedPos);
+        var secondMatches = FindMatchesAtPos(_secondSelectedPos);
         
-        sequence.Join(secondPiece.transform
-            .DOLocalMove(firstCell.GetPosition(), _boardInfo.SwapDuration)
-            .SetEase(_boardInfo.SwapEase)
-        );
-
-        SwapCellItem(firstCell, secondCell);
+        var popOffTask = PopOffPieces(new List<Vector2Int>{_firstSelectedPos, _secondSelectedPos});
         
-        var firstMatch = FindMatchesAtPos(_firstSelectedPos);
-        var secondMatch = FindMatchesAtPos(_secondSelectedPos);
-
-        if (firstMatch.Count == 0 && secondMatch.Count == 0)
+        if (firstMatches.Count == 0 && secondMatches.Count == 0)
         {
-            sequence.Append(firstPiece.transform
-                .DOLocalMove(firstCell.GetPosition(), _boardInfo.SwapDuration)
-                .SetEase(_boardInfo.SwapEase)
-            );
-        
-            sequence.Join(secondPiece.transform
-                .DOLocalMove(secondCell.GetPosition(), _boardInfo.SwapDuration)
-                .SetEase(_boardInfo.SwapEase)
-            ); 
+            await SwapPieces(_firstSelectedPos, _secondSelectedPos);
+            await popOffTask;
             
-            SwapCellItem(firstCell, secondCell);
+            _enableSelection = true;
         }
-
-        sequence.Append(PopOffTween(_firstSelectedPos));
-        sequence.Join(PopOffTween(_secondSelectedPos));
-        
-        await sequence.Play().AsyncWaitForCompletion();
+        else
+        {
+            await popOffTask;
+            var matches = firstMatches.Union(secondMatches).ToList();
+            
+            HandleResolveBoard(matches);
+        }
         
         _firstSelectedPos = Vector2Int.one * -1;
         _secondSelectedPos = Vector2Int.one * -1;
     }
-    
-    private void SwapCellItem(Cell<Piece> firstCell, Cell<Piece> secondCell)
+    private async void HandleResolveBoard(List<Vector2Int> matches)
     {
-        var firstPiece = firstCell.GetItem();
-        var secondPiece = secondCell.GetItem();
+        await ExplodePieces(matches);
+        await MakePiecesFall();
+        GeneratePiecesInExtraCell();
 
-        firstCell.SetItem(secondPiece, false);
-        secondCell.SetItem(firstPiece, false);
+        var fallCol = new Dictionary<int, bool>();
+        for (var x = 0; x <= _boardInfo.Width; x++) fallCol[x] = false;
+
+        foreach (var match in matches) fallCol[match.x] = true;
+        
+        matches = FindMatchesAtColumns(fallCol);
+
+        while (matches.Count() >= 3)
+        {
+            await ExplodePieces(matches);
+            await MakePiecesFall();
+            GeneratePiecesInExtraCell();
+
+            for (var x = 0; x <= _boardInfo.Width; x++) fallCol[x] = false;
+            foreach (var match in matches) fallCol[match.x] = true;
+            
+            matches = FindMatchesAtColumns(fallCol);
+        }
+        
+        _enableSelection = true;
     }
-
     #region Piece Action
+    private async Task SwapPieces(Vector2Int firstPos, Vector2Int secondPos)
+    {
+        var firstCell = _grid.GetValue(firstPos.x, firstPos.y);
+        var secondCell = _grid.GetValue(secondPos.x, secondPos.y);
+
+        var sequence = DOTween.Sequence();
+
+        sequence.Join(firstCell.GetItem().transform
+            .DOLocalMove(_grid.GetWorldPositionCenter(secondPos.x, secondPos.y),
+                _boardInfo.SwapDuration)
+            .SetEase(_boardInfo.SwapEase));
+
+        sequence.Join(secondCell.GetItem().transform
+            .DOLocalMove(_grid.GetWorldPositionCenter(firstPos.x, firstPos.y), _boardInfo.SwapDuration)
+            .SetEase(_boardInfo.SwapEase));
+
+        _grid.SetValue(firstPos.x, firstPos.y, secondCell);
+        _grid.SetValue(secondPos.x, secondPos.y, firstCell);
+
+        await sequence.AsyncWaitForCompletion();
+    }
     private async Task MakePiecesFall()
     {
+        var sequence = DOTween.Sequence();
+        for (var x = 0; x < _boardInfo.Width; x++)
+        {
+            var emptyRow = -1;
+
+            for (var y = 0; y < _boardInfo.Height + _boardInfo.Extra; y++)
+            {
+                var cell = _grid.GetValue(x, y);
+                if (cell == null)
+                {
+                    if (emptyRow == -1) emptyRow = y;
+                    continue;
+                }
+
+                if (emptyRow != -1)
+                {
+                    var piece = cell.GetItem();
+                    _grid.SetValue(x, emptyRow, cell);
+                    _grid.SetValue(x, y, null);
+
+                    sequence.Join(piece.transform
+                        .DOLocalMove(_grid.GetWorldPositionCenter(x, emptyRow), _boardInfo.FallDuration)
+                        .SetEase(_boardInfo.FallEase));
+                    
+                    emptyRow++;
+                }
+            }
+        }
+            
+        await sequence.AsyncWaitForCompletion();
+    }
+    private async Task ExplodePieces(List<Vector2Int> matches)
+    {
+        var explodedPieces = new List<Piece>();
         
+        var sequence = DOTween.Sequence();
+
+        foreach (var match in matches)
+        {
+            var piece = _grid.GetValue(match.x, match.y).GetItem();
+
+            if (piece == null)
+            {
+                Debug.LogError($"Piece is null at {matches}");
+            }
+            
+            explodedPieces.Add(piece);
+            _grid.SetValue(match.x, match.y, null);
+            
+            sequence.Append(ExplodeTween(piece));
+        }
+        
+        sequence.Play();
+
+        sequence.OnComplete(() =>
+        {
+            foreach (var piece in explodedPieces)
+            {
+                _piecePool.ReturnPiece(piece);
+            }
+        });
+        
+        //TODO: run explode event here
+
+        await sequence.AsyncWaitForCompletion();
+    }
+    private Tween ExplodeTween(Piece piece)
+    {
+        return piece.transform
+            .DOScale(Vector3.zero, _boardInfo.ExplodeDuration)
+            .SetEase(_boardInfo.ExplodeEase);
     }
     #endregion
 
     #region Match Finding
+
+    private List<Vector2Int> FindMatchesAtColumns(Dictionary<int, bool> colDict, bool checkExtra = false)
+    {
+        var totalMatches = new HashSet<Vector2Int>();
+
+        for (var x = 0; x < _boardInfo.Width; x++)
+        {
+            if (!colDict[x]) continue;
+            
+            var matches = FindMatchesAtColumn(x, checkExtra);
+            
+            foreach (var match in matches) totalMatches.Add(match);
+        }
+        
+        return totalMatches.ToList();
+    }
+    private List<Vector2Int> FindMatchesAtColumn(int col, bool checkExtra = false)
+    {
+        var totalMatches = new HashSet<Vector2Int>();
+
+        for (var y = 0; y < _boardInfo.Height; y++)
+        {
+            var matches = FindMatchesAtPos(new Vector2Int(col, y), checkExtra);
+            
+            foreach (var match in matches) totalMatches.Add(match);
+        }
+
+        return totalMatches.ToList();
+    }
     private List<Vector2Int> FindMatchesAtPos(Vector2Int pos, bool checkExtra = false)
     {
         var matchPositions = new List<Vector2Int>();
@@ -272,27 +376,53 @@ public class ImproveBoard: ValidatedMonoBehaviour
 
         if (isHorizontalValid)
         {
-            var maxStep = Mathf.Min(pos.y - startY, endY - pos.y);
+            var lockLeft = false;
+            var lockRight = false;
+            var maxStep = Mathf.Max(pos.y - startY, endY - pos.y);
             for (var step = 0; step <= maxStep; step++)
             {
+                if (lockLeft && lockRight) break;
+                
                 var leftPos = new Vector2Int(pos.x, pos.y - step);
                 var rightPos = new Vector2Int(pos.x, pos.y + step);
-                
-                if (AreTwoMatching(pos, rightPos)) matchPositions.Add(rightPos);
-                if (AreTwoMatching(pos, leftPos)) matchPositions.Add(leftPos);
+
+                if (!lockRight)
+                {
+                    if (IsValidPosition(rightPos, false) && AreTwoMatching(pos, rightPos)) matchPositions.Add(rightPos);
+                    else lockRight = true;
+                }
+
+                if (!lockLeft)
+                {
+                    if (IsValidPosition(leftPos, false) && AreTwoMatching(pos, leftPos)) matchPositions.Add(leftPos);
+                    else lockLeft = true;
+                }
             }
         }
         
         if (isVerticalValid)
         {
-            var maxStep = Mathf.Min(pos.x, _boardInfo.Width - pos.x);
+            var lockUp = false;
+            var lockDown = false;
+            var maxStep = Mathf.Max(pos.x, _boardInfo.Width - pos.x);
             for (var step = 0; step <= maxStep; step++)
             {
+                if (lockUp && lockDown) break;
+                
                 var upPos = new Vector2Int(pos.x + step, pos.y);
                 var downPos = new Vector2Int(pos.x - step, pos.y);
-                
-                if (AreTwoMatching(pos, upPos)) matchPositions.Add(upPos);
-                if (AreTwoMatching(pos, downPos)) matchPositions.Add(downPos);
+
+                if (!lockUp)
+                {
+                    if (IsValidPosition(upPos, false) && AreTwoMatching(pos, upPos)) matchPositions.Add(upPos);
+                    else lockUp = true;
+                }
+
+                if (!lockDown)
+                {
+                    if (IsValidPosition(downPos, false) && AreTwoMatching(pos, downPos)) matchPositions.Add(downPos);
+                    else lockDown = true;
+                }
             }
         }
         
@@ -362,7 +492,8 @@ public class ImproveBoard: ValidatedMonoBehaviour
         return false;
     }
     #endregion
-    
+
+    #region Pop Piece
     private void PopOffPiece(Vector2Int pos)
     {
         var sequence = DOTween.Sequence();
@@ -371,7 +502,17 @@ public class ImproveBoard: ValidatedMonoBehaviour
         
         sequence.Append(PopOffTween(pos));
     }
-    
+    private async Task PopOffPieces(List<Vector2Int> positions)
+    {
+        var sequence = DOTween.Sequence();
+
+        foreach (var pos in from pos in positions let piece = _grid.GetValue(pos.x, pos.y).GetItem() select pos)
+        {
+            sequence.Join(PopOffTween(pos));
+        }
+        
+        await sequence.AsyncWaitForCompletion();
+    }
     private void PopOutPiece(Vector2Int pos)
     {
         var sequence = DOTween.Sequence();
@@ -380,7 +521,6 @@ public class ImproveBoard: ValidatedMonoBehaviour
         
         sequence.Append(PopOutTween(pos));
     }
-
     private Tween PopOutTween(Vector2Int pos)
     {
         var piece = _grid.GetValue(pos.x, pos.y).GetItem();;
@@ -389,7 +529,6 @@ public class ImproveBoard: ValidatedMonoBehaviour
             .DOScale(Vector3.one * _boardInfo.SelectPopOutScale, _boardInfo.SelectPopDuration)
             .SetEase(_boardInfo.SelectPopSwapEase);
     }
-
     private Tween PopOffTween(Vector2Int pos)
     {
         var piece = _grid.GetValue(pos.x, pos.y).GetItem();;
@@ -398,6 +537,7 @@ public class ImproveBoard: ValidatedMonoBehaviour
             .DOScale(Vector3.one * _boardInfo.SelectPopOffScale, _boardInfo.SelectPopDuration)
             .SetEase(_boardInfo.SelectPopSwapEase);
     }
+    #endregion
     
     #region Utils
     private static bool IsNeighbor(Vector2Int first, Vector2Int second) => Mathf.Abs(first.x - second.x) + Mathf.Abs(first.y - second.y) == 1;

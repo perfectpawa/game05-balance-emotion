@@ -7,7 +7,6 @@ namespace MatchThreeSystem
         private GridSystem2D<Cell<T>> _grid;
         private int _x;
         private int _y;
-        private Vector3 _position;
         private T _item;
 
         public Cell(GridSystem2D<Cell<T>> grid, int x, int y)
@@ -17,17 +16,16 @@ namespace MatchThreeSystem
             _y = y;
         }
 
-        public void SetItem(T value, bool updatePosition = true)
+        public void SetItem(T value)
         {
             _item = value;
 
             //update position for the object
-            _position = _grid.GetWorldPositionCenter(_x, _y);
-            
+            var pos = _grid.GetWorldPositionCenter(_x, _y);
 
             if (_item is MonoBehaviour monoBehaviour)
             {
-                if (updatePosition) monoBehaviour.transform.position = _position;
+                monoBehaviour.transform.position = pos;
             }
             else
             {
@@ -35,8 +33,7 @@ namespace MatchThreeSystem
             }
         }
 
-        public T GetItem() => _item;
-        public Vector3 GetPosition() => _position;
 
+        public T GetItem() => _item;
     }
 }
